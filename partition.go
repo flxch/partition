@@ -52,26 +52,29 @@ func (p *Partition[T]) Next() {
 // Refine splits each block in the partition according to the subset s.
 func (p *Partition[T]) Refine(s []T) {
     p.Next()
-    if len(s) <= len(p.hooks) / 2 {
-        for _, v := range s {
-            p.Split(v)
-        }
-    } else {
-        // Split by the complement of s using scratch map to avoid allocations.
-        // TODO: Not sure if this else branch makes sense. It should be an
-        // optimization.  However, clearing a map and adding the elements to the
-        // map, is a time consuming step.  Benchmarking this part should provide
-        // clarity.
-        clear(p.scratch)
-        for _, v := range s {
-            p.scratch[v] = struct{}{}
-        }
-        for v := range p.hooks {
-            if _, found := p.scratch[v]; !found {
-                p.Split(v)
-            }
-        }
+    for _, v := range s {
+        p.Split(v)
     }
+    // if len(s) <= len(p.hooks) / 2 {
+    //     for _, v := range s {
+    //         p.Split(v)
+    //     }
+    // } else {
+    //     // Split by the complement of s using scratch map to avoid allocations.
+    //     // TODO: Not sure if this else branch makes sense. It should be an
+    //     // optimization.  However, clearing a map and adding the elements to the
+    //     // map, is a time consuming step.  Benchmarking this part should provide
+    //     // clarity.
+    //     clear(p.scratch)
+    //     for _, v := range s {
+    //         p.scratch[v] = struct{}{}
+    //     }
+    //     for v := range p.hooks {
+    //         if _, found := p.scratch[v]; !found {
+    //             p.Split(v)
+    //         }
+    //     }
+    // }
 }
 
 // RefineFn is the dual version of Refine, using a predicate.

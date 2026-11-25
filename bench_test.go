@@ -2,13 +2,15 @@ package partition
 
 
 import (
+    "fmt"
     "testing"
     "math/rand"
 )
 
 
 const (
-    Q = 16 // number of refinements steps
+    size  = 10000 // number of elements
+    steps = 15    // number of refinements steps
 )
 
 
@@ -26,36 +28,97 @@ func BenchmarkRefine(b *testing.B) {
     b.StopTimer()
     b.ReportAllocs()
     b.SetBytes(int64(b.N))
-    elements := make([]int, b.N)
-    for j := range elements {
-        elements[j] = j
+
+    elems := make([]int, size)
+    for j := range elems {
+        elems[j] = j
     }
-    p := Trivial(elements)
+
     for i := 0; i < b.N; i++ {
-        s := splitter(b.N)
+        p := Trivial(elems)
+
+        for q := 0; q < steps; q++ {
+            s := splitter(size)
+            b.StartTimer()
+            p.Refine(s)
+            b.StopTimer()
+        }
+    }
+}
+
+func BenchmarkRefines(b *testing.B) {
+    b.StopTimer()
+    elems := make([]int, size)
+    for j := range elems {
+        elems[j] = j
+    }
+
+    for q := 0; q < steps; q++ {
+        b.Run(fmt.Sprintf("@%d", q), func(c *testing.B) {
+            // Measure the (q+1)st refinement step.
+            c.ReportAllocs()
+            c.SetBytes(int64(c.N))
+
+            for i := 0; i < c.N; i++ {
+                p := Trivial(elems)
+                for s := 0; s < q; s++ {
+                    p.Refine(splitter(size))
+                }
+
+                s := splitter(size)
+                b.StartTimer()
+                p.Refine(s)
+                b.StopTimer()
+            }
+        })
+    }
+}
+
+func BenchmarkSingleRefine(b *testing.B) {
+    b.StopTimer()
+    b.ReportAllocs()
+    b.SetBytes(int64(b.N))
+
+    elems := make([]int, size)
+    for j := range elems {
+        elems[j] = j
+    }
+
+    for i := 0; i < b.N; i++ {
+        p := Trivial(elems)
+        for q := 0; q < steps / 3; q++ {
+            s := splitter(size)
+            p.Refine(s)
+        }
+
+        s := splitter(size)
         b.StartTimer()
         p.Refine(s)
         b.StopTimer()
     }
 }
 
+
+
 func BenchmarkApply(b *testing.B) {
     b.StopTimer()
     b.ReportAllocs()
     b.SetBytes(int64(b.N))
+
+    elems := make([]int, size)
+    for j := range elems {
+        elems[j] = j
+    }
+
     for i := 0; i < b.N; i++ {
-        elements := make([]int, b.N)
-        for j := range elements {
-            elements[j] = j
-        }
-        p := Trivial(elements)
-        for q := 0; q < Q; q++ {
-            s := splitter(b.N)
+        p := Trivial(elems)
+        for q := 0; q < steps; q++ {
+            s := splitter(size)
             p.Refine(s)
         }
 
-        b.StartTimer()
         firsts, others := 0, 0
+        b.StartTimer()
         p.Apply(func(_ int) { firsts++ }, func(_, _ int) { others++ })
         b.StopTimer()
     }
@@ -65,21 +128,25 @@ func BenchmarkAll(b *testing.B) {
     b.StopTimer()
     b.ReportAllocs()
     b.SetBytes(int64(b.N))
-    for i := 0; i < b.N; i++ {
-        elements := make([]int, b.N)
-        for j := range elements {
-            elements[j] = j
-        }
 
+    elems := make([]int, size)
+    for j := range elems {
+        elems[j] = j
+    }
+    for i := 0; i < size; i++ {
         b.StartTimer()
-        p := Trivial(elements)
-        for q := 0; q < Q; q++ {
-            b.StopTimer()
-            s := splitter(b.N)
+        p := Trivial(elems)
+        b.StopTimer()
+
+        for q := 0; q < steps; q++ {
+            s := splitter(size)
             b.StartTimer()
             p.Refine(s)
+            b.StopTimer()
         }
+
         firsts, others := 0, 0
+        b.StartTimer()
         p.Apply(func(_ int) { firsts++ }, func(_, _ int) { others++ })
         b.StopTimer()
     }
