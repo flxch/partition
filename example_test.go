@@ -84,6 +84,8 @@ func ExampleRefineFn() {
 func ExampleUnionFind() {
     // Create a union-find for strings
     uf := partition.NewUnionFind("a", "b", "c", "d")
+
+    // Merge some blocks.
     uf.Union("a", "b")
     uf.Union("c", "d")
     uf.Union("b", "c")
@@ -109,11 +111,10 @@ func ExampleUnionFind() {
 
 func ExampleNewUnionFindInt() {
     // The union-find implementation is optimized for a prefix of the integers.
-
-    // Create a union-find for integers 0..5
+    // Create a union-find for integers 0..5.
     uf := partition.NewUnionFindInt(6)
 
-    // Merge some sets
+    // Merge some blocks.
     uf.Union(0, 1)
     uf.Union(2, 3)
     uf.Union(1, 2)
