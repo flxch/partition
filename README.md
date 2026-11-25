@@ -86,7 +86,7 @@ func main() {
     ufg.Union("a", "b")   // Union the block that contains "a" with the block that contains "b".
     ufg.Union("c", "d")   // Union the block that contains "c" with the block that contains "d".
     ufg.Union("b", "c")   // Union the block that contains "b" with the block that contains "c".
-	// Result: Single block that contain all elements.
+    // Result: Single block that contain all elements.
 
     fmt.Println("Connected(a, d):", ufg.Connected("a", "d"))
     fmt.Println("Size(a):", ufg.Size("a"))
@@ -98,13 +98,13 @@ func main() {
         fmt.Println(comp)
     }
 
-	// Output:
-	// Connected(a, d): true
-	// Size(a): 4
-	// Count: 1
-	// Roots: [a]
-	// Components:
-	// [a b c d]
+    // Output:
+    // Connected(a, d): true
+    // Size(a): 4
+    // Count: 1
+    // Roots: [a]
+    // Components:
+    // [a b c d]
 }
 ```
 
