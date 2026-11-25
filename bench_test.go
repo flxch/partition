@@ -1,5 +1,6 @@
 package partition
 
+
 import (
     "testing"
     "math/rand"
@@ -55,7 +56,7 @@ func BenchmarkApply(b *testing.B) {
 
         b.StartTimer()
         firsts, others := 0, 0
-        p.Apply(func(a, b int) bool { return a < b }, func(_ int) { firsts++ }, func(_, _ int) { others++ })
+        p.Apply(func(_ int) { firsts++ }, func(_, _ int) { others++ })
         b.StopTimer()
     }
 }
@@ -79,7 +80,8 @@ func BenchmarkAll(b *testing.B) {
             p.Refine(s)
         }
         firsts, others := 0, 0
-        p.Apply(func(a, b int) bool { return a < b }, func(_ int) { firsts++ }, func(_, _ int) { others++ })
+        p.Apply(func(_ int) { firsts++ }, func(_, _ int) { others++ })
         b.StopTimer()
     }
 }
+

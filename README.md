@@ -23,35 +23,42 @@ package main
 
 import (
     "fmt"
-    "sort"
-    "partition"
+    "maps"
+    "slices"
+    "github.com/flxch/partition"
 )
 
 func main() {
-    elements := []int{0, 1, 2, 3, 4, 5}
-    splitters := [][]int{
-        {0, 2, 4}, // First refinement
-        {1, 4},    // Second refinement
-    }
-    blocks := map[int][]int{}
-    less := func(a, b int) bool { return a < b }
-    head := func(a int) { blocks[a] = []int{a} }
-    tail := func(a, b int) { blocks[b] = append(blocks[b], a) }
-    partition.Refine(less, head, tail, elements, splitters...)
+    elems := []string{"banana", "apple", "tomato", "broccoli", "cucumber", "kiwi", "potato", "cherry", "orange", "icecream"}
+    likedByMinions := func(s string) bool { return s == "banana" || s == "apple" || s == "papaya" || s == "icecream" }
+    isFruit := func(s string) bool { return s == "apple" || s == "banana" || s == "kiwi" || s == "cherry" || s == "orange" }
 
-    keys := make([]int, 0, len(blocks))
-    for k := range blocks {
-        keys = append(keys, k)
+    // Refine set of elements, starting from the trivial partition consisting of
+    // a single block.  Write the blocks of the resulting partition blocks to
+    // the slice map at the end.
+    blocks := make(map[string][]string, len(elems))
+    partition.RefineFn(func(a string) { blocks[a] = []string{a}},
+        func(a, b string) { blocks[b] = append(blocks[b], a) },
+        elems, []partition.SplitFn[string]{likedByMinions, isFruit})
+    // Note that there is no guarantee how the elements in a slice are ordered
+    // and at under which key a block appears in the map.
+
+    // Make the smallest element of a block the key of the block.
+    for k, b := range blocks {
+        delete(blocks, k)
+        slices.Sort(b)
+        blocks[b[0]] = b
     }
-    sort.Ints(keys)
-    for _, k := range keys {
-        fmt.Println(blocks[k])
+    // Print blocks sorted in the order of the blocks' smallest element.
+    for _, v := range slices.Sorted(maps.Keys(blocks)) {
+        fmt.Println(blocks[v])
     }
+
     // Output:
-    // [0 2]
-    // [1]
-    // [3 5]
-    // [4]
+    // [apple banana]
+    // [broccoli cucumber potato tomato]
+    // [cherry kiwi orange]
+    // [icecream]
 }
 ```
 

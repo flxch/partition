@@ -1,32 +1,45 @@
-package partition
+package partition_test
+
 
 import (
-    "cmp"
     "fmt"
     "maps"
     "slices"
+
+    "github.com/flxch/partition"
 )
 
 
-// ExampleRefine demonstrates how to use the generic partition refinement
-// functions.
 func ExampleRefine() {
-    elements := []int{0, 1, 2, 3, 4, 5}
+    elems := []int{0, 1, 2, 3, 4, 5}
     splitters := [][]int{
         {0, 2, 4}, // First refinement: split out 0, 2, 4
         {1, 4},    // Second refinement: split out 1, 4
     }
 
-    blocks := map[int][]int{}
-    Refine(cmp.Less,
-        func(a int) { blocks[a] = []int{a}},
+    // Refine set of elements, starting from the trivial partition consisting of
+    // a single block.  Write the blocks of the resulting partition blocks to
+    // the slice blocks.
+    blocks := make([][]int, len(elems))
+    partition.Refine(func(a int) { blocks[a] = []int{a}},
         func(a, b int) { blocks[b] = append(blocks[b], a) },
-        elements, splitters...)
+        elems, splitters...)
+    // Note that there is no guarantee how the elements in a block are ordered
+    // and at what index a block appears in the slice blocks.
 
-    // Print blocks sorted by their canonical element.
-    for _, k := range slices.Sorted(maps.Keys(blocks)) {
-        slices.Sort(blocks[k])
-        fmt.Println(blocks[k])
+    // Make the smallest element of a block the index of the block.
+    for i, b := range blocks {
+        if len(b) > 0 {
+            blocks[i] = nil
+            blocks[slices.Min(b)] = b
+        }
+    }
+    // Print blocks sorted in the order of their smallest element.
+    for _, b := range blocks {
+        if len(b) > 0 {
+            slices.Sort(b)
+            fmt.Println(b)
+        }
     }
 
     // Output:
@@ -34,4 +47,38 @@ func ExampleRefine() {
     // [1]
     // [3 5]
     // [4]
+}
+
+
+func ExampleRefineFn() {
+    elems := []string{"banana", "apple", "tomato", "broccoli", "cucumber", "kiwi", "potato", "cherry", "orange", "icecream"}
+    likedByMinions := func(s string) bool { return s == "banana" || s == "apple" || s == "papaya" || s == "icecream" }
+    isFruit := func(s string) bool { return s == "apple" || s == "banana" || s == "kiwi" || s == "cherry" || s == "orange" }
+
+    // Refine set of elements, starting from the trivial partition consisting of
+    // a single block.  Write the blocks of the resulting partition blocks to
+    // the slice map at the end.
+    blocks := make(map[string][]string, len(elems))
+    partition.RefineFn(func(a string) { blocks[a] = []string{a}},
+        func(a, b string) { blocks[b] = append(blocks[b], a) },
+        elems, []partition.SplitFn[string]{likedByMinions, isFruit})
+    // Note that there is no guarantee how the elements in a slice are ordered
+    // and at under which key a block appears in the map.
+
+    // Make the smallest element of a block the key of the block.
+    for k, b := range blocks {
+        delete(blocks, k)
+        slices.Sort(b)
+        blocks[b[0]] = b
+    }
+    // Print blocks sorted in the order of blocks' smallest element.
+    for _, v := range slices.Sorted(maps.Keys(blocks)) {
+        fmt.Println(blocks[v])
+    }
+
+    // Output:
+    // [apple banana]
+    // [broccoli cucumber potato tomato]
+    // [cherry kiwi orange]
+    // [icecream]
 }
