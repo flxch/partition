@@ -21,8 +21,7 @@ func ExampleRefine() {
     // a single block.  Write the blocks of the resulting partition blocks to
     // the slice blocks.
     blocks := make([][]int, len(elems))
-    partition.Refine(func(a int) { blocks[a] = []int{a}},
-        func(a, b int) { blocks[b] = append(blocks[b], a) },
+    partition.Refine(func(a int) { blocks[a] = []int{a}}, func(a, b int) { blocks[b] = append(blocks[b], a) },
         elems, splitters...)
     // Note that there is no guarantee how the elements in a block are ordered
     // and at what index a block appears in the slice blocks.
@@ -59,9 +58,9 @@ func ExampleRefineFn() {
     // a single block.  Write the blocks of the resulting partition blocks to
     // the slice map at the end.
     blocks := make(map[string][]string, len(elems))
-    partition.RefineFn(func(a string) { blocks[a] = []string{a}},
-        func(a, b string) { blocks[b] = append(blocks[b], a) },
-        elems, []partition.SplitFn[string]{likedByMinions, isFruit})
+    partition.RefineFn(func(a string) { blocks[a] = []string{a}}, func(a, b string) { blocks[b] = append(blocks[b], a) },
+        elems,
+        likedByMinions, isFruit)
     // Note that there is no guarantee how the elements in a slice are ordered
     // and at under which key a block appears in the map.
 

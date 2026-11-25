@@ -16,17 +16,13 @@ func Refine[T comparable](head func(T), tail func(T, T), elems []T, splits ...[]
     }
 }
 
-// RefineFn is similar to Refine, except that its arguments m and split replace
-// Refine's last argument splits. Refinef carries out m refinement steps. In the
-// (i+1)st step, the "splitter" is given by split(j, i), where j ranges over
-// elements. In particular,
-//   Refine(head, tail, elements, splits...)
-// produces the same partition as
-//   Refinef(head, tail, elements, len(splits), func(j, i int) bool { return "j in splits[i]" })
-func RefineFn[T comparable](head func(T), tail func(T, T), elems []T, split []SplitFn[T]) {
+// RefineFn is similar to Refine, except that its argument splitFns replaces
+// Refine's last argument splits. For each provided split function, RefineFn
+// carries out a refinement steps.
+func RefineFn[T comparable](head func(T), tail func(T, T), elems []T, splitFns ...SplitFn[T]) {
     if len(elems) > 0 {
         p := Trivial(elems)
-        for _, s := range split {
+        for _, s := range splitFns {
             p.RefineFn(s)
         }
         p.Apply(head, tail)
@@ -41,12 +37,16 @@ func RefineFn[T comparable](head func(T), tail func(T, T), elems []T, split []Sp
 // tail. When done, the function's returned channel is closed.
 func RefineCh[T comparable](head func(T), tail func(T, T), elems []T, in <-chan T, next T) <-chan struct{} {
     if len(elems) < 1 {
+        // No parition when no elements.
+        // QUESTION: Should we panic? Same for the other refine functions.
         return nil
     }
+
     done := make(chan struct{}, 0)
+    p := Trivial(elems)
+    p.Next()
+
     go func() {
-        p := Trivial(elems)
-        p.Next()
         for v := range in {
             if v != next {
                 p.Split(v)
@@ -57,6 +57,7 @@ func RefineCh[T comparable](head func(T), tail func(T, T), elems []T, in <-chan 
         p.Apply(head, tail)
         close(done)
     }()
+
     return done
 }
 
