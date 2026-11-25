@@ -39,7 +39,7 @@ func main() {
     blocks := make(map[string][]string, len(elems))
     partition.RefineFn(func(a string) { blocks[a] = []string{a}}, func(a, b string) { blocks[b] = append(blocks[b], a) },
         elems, 
-		[]partition.SplitFn[string]{likedByMinions, isFruit})
+        likedByMinions, isFruit)
     // Note that there is no guarantee how the elements in a slice are ordered
     // and at under which key a block appears in the map.
 
