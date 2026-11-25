@@ -100,7 +100,7 @@ func BenchmarkSingleRefine(b *testing.B) {
 
 
 
-func BenchmarkApply(b *testing.B) {
+func BenchmarkRefineApply(b *testing.B) {
     b.StopTimer()
     b.ReportAllocs()
     b.SetBytes(int64(b.N))
@@ -124,7 +124,7 @@ func BenchmarkApply(b *testing.B) {
     }
 }
 
-func BenchmarkAll(b *testing.B) {
+func BenchmarkRefineAll(b *testing.B) {
     b.StopTimer()
     b.ReportAllocs()
     b.SetBytes(int64(b.N))
@@ -152,3 +152,89 @@ func BenchmarkAll(b *testing.B) {
     }
 }
 
+
+//////////////////////////////////////////////////////////////////////
+
+
+func BenchmarkUnionFindIntSequentialUnion(b *testing.B) {
+    n := 100000
+    b.ReportAllocs()
+    b.ResetTimer()
+
+    for i := 0; i < b.N; i++ {
+        uf := NewUnionFindInt(n)
+        for j := 0; j < n-1; j++ {
+            uf.Union(j, j+1)
+        }
+    }
+}
+
+func BenchmarkUnionFindIntRandomUnionFind(b *testing.B) {
+    n := 100000
+    r := rand.New(rand.NewSource(42))
+    ops := make([][2]int, n)
+    for i := range ops {
+        ops[i] = [2]int{r.Intn(n), r.Intn(n)}
+    }
+
+    b.ReportAllocs()
+    b.ResetTimer()
+
+    for i := 0; i < b.N; i++ {
+        uf := NewUnionFindInt(n)
+        for _, op := range ops {
+            uf.Union(op[0], op[1])
+        }
+        for _, op := range ops {
+            uf.Find(op[0])
+        }
+    }
+}
+
+func BenchmarkUnionFindIntFindPathCompression(b *testing.B) {
+    n := 100000
+    uf := NewUnionFindInt(n)
+    for i := 0; i < n-1; i++ {
+        uf.Union(i, i+1)
+    }
+
+    b.ReportAllocs()
+    b.ResetTimer()
+
+    for i := 0; i < b.N; i++ {
+        _, _ = uf.Find(i % n)
+    }
+}
+
+func BenchmarkUnionFindGenericStrings(b *testing.B) {
+    n := 10000
+    items := make([]string, n)
+    for i := 0; i < n; i++ {
+        items[i] = fmt.Sprintf("item_%d", i)
+    }
+
+    b.ReportAllocs()
+    b.ResetTimer()
+
+    for i := 0; i < b.N; i++ {
+        uf := NewUnionFind(items...)
+        for j := 0; j < n-1; j += 2 {
+            uf.Union(items[j], items[j+1])
+        }
+    }
+}
+
+func BenchmarkUnionFindResetReuse(b *testing.B) {
+    n := 100000
+    uf := NewUnionFindInt(n)
+
+    b.ReportAllocs()
+    b.ResetTimer()
+
+    for i := 0; i < b.N; i++ {
+        uf.Reset()
+        for j := 0; j < n-1; j += 2 {
+            uf.Union(j, j+1)
+        }
+    }
+}
