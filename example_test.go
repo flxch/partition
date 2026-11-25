@@ -1,6 +1,5 @@
 package partition_test
 
-
 import (
     "fmt"
     "maps"
@@ -48,7 +47,6 @@ func ExampleRefine() {
     // [4]
 }
 
-
 func ExampleRefineFn() {
     elems := []string{"banana", "apple", "tomato", "broccoli", "cucumber", "kiwi", "potato", "cherry", "orange", "icecream"}
     likedByMinions := func(s string) bool { return s == "banana" || s == "apple" || s == "papaya" || s == "icecream" }
@@ -80,4 +78,67 @@ func ExampleRefineFn() {
     // [broccoli cucumber potato tomato]
     // [cherry kiwi orange]
     // [icecream]
+}
+
+
+func ExampleUnionFind() {
+    // Create a union-find for strings
+    uf := partition.NewUnionFind("a", "b", "c", "d")
+    uf.Union("a", "b")
+    uf.Union("c", "d")
+    uf.Union("b", "c")
+
+    fmt.Println("Connected(a, d):", uf.Connected("a", "d"))
+    fmt.Println("Size(a):", uf.Size("a"))
+    fmt.Println("Count:", uf.Count())
+    fmt.Println("Roots:", uf.Roots())
+    fmt.Println("Components:")
+    for _, comp := range uf.Components() {
+        slices.Sort(comp)
+        fmt.Println(comp)
+    }
+
+    // Output:
+    // Connected(a, d): true
+    // Size(a): 4
+    // Count: 1
+    // Roots: [a]
+    // Components:
+    // [a b c d]
+}
+
+func ExampleNewUnionFindInt() {
+    // The union-find implementation is optimized for a prefix of the integers.
+
+    // Create a union-find for integers 0..5
+    uf := partition.NewUnionFindInt(6)
+
+    // Merge some sets
+    uf.Union(0, 1)
+    uf.Union(2, 3)
+    uf.Union(1, 2)
+    uf.Union(4, 5)
+
+    fmt.Println("Connected(0, 3):", uf.Connected(0, 3))
+    fmt.Println("Connected(0, 4):", uf.Connected(0, 4))
+    fmt.Println("Size(0):", uf.Size(0))
+    fmt.Println("Size(4):", uf.Size(4))
+    fmt.Println("Count:", uf.Count())
+    fmt.Println("Roots:", uf.Roots())
+    fmt.Println("Components:")
+    for _, comp := range uf.Components() {
+        slices.Sort(comp)
+        fmt.Println(comp)
+    }
+
+    // Output:
+    // Connected(0, 3): true
+    // Connected(0, 4): false
+    // Size(0): 4
+    // Size(4): 2
+    // Count: 2
+    // Roots: [0 4]
+    // Components:
+    // [0 1 2 3]
+    // [4 5]
 }
