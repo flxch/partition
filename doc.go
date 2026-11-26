@@ -5,5 +5,6 @@ package partition
 
 
 // TODOs:
+// - Add unit tests for corner cases.
 // - Unify type, variable, and function nameing.
 // - Improve package API.

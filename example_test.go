@@ -4,6 +4,7 @@ import (
     "fmt"
     "maps"
     "slices"
+    "sort"
 
     "github.com/flxch/partition"
 )
@@ -83,30 +84,37 @@ func ExampleRefineFn() {
 
 func ExampleUnionFind() {
     // Create a union-find for strings
-    uf := partition.NewUnionFind("a", "b", "c", "d")
+    uf := partition.NewUnionFind("banana", "apple", "tomato", "papaya", "icecream")
 
     // Merge some blocks.
-    uf.Union("a", "b")
-    uf.Union("c", "d")
-    uf.Union("b", "c")
+    uf.Union("banana", "apple")
+    uf.Union("papaya", "icecream")
+    uf.Union("apple", "papaya")
 
-    fmt.Println("Connected(a, d):", uf.Connected("a", "d"))
-    fmt.Println("Size(a):", uf.Size("a"))
+    fmt.Println("Connected(banana, papaya):", uf.Connected("banana", "papaya"))
+    fmt.Println("Size(banana):", uf.Size("banana"))
     fmt.Println("Count:", uf.Count())
     fmt.Println("Roots:", uf.Roots())
     fmt.Println("Components:")
-    for _, comp := range uf.Components() {
-        slices.Sort(comp)
-        fmt.Println(comp)
+    blocks := uf.Components()
+    // To obtain a canonical presentation, sort each block and order the blocks
+    // afterwards after their first elements.
+    for _, b := range blocks {
+        slices.Sort(b)
+    }
+    sort.Slice(blocks, func(i, j int) bool { return blocks[i][0] < blocks[j][0] })
+    for _, b := range blocks {
+        fmt.Println(b)
     }
 
     // Output:
-    // Connected(a, d): true
-    // Size(a): 4
-    // Count: 1
-    // Roots: [a]
+    // Connected(banana, papaya): true
+    // Size(banana): 4
+    // Count: 2
+    // Roots: [banana tomato]
     // Components:
-    // [a b c d]
+    // [apple banana icecream papaya]
+    // [tomato]
 }
 
 func ExampleNewUnionFindInt() {
@@ -127,9 +135,15 @@ func ExampleNewUnionFindInt() {
     fmt.Println("Count:", uf.Count())
     fmt.Println("Roots:", uf.Roots())
     fmt.Println("Components:")
-    for _, comp := range uf.Components() {
-        slices.Sort(comp)
-        fmt.Println(comp)
+    blocks := uf.Components()
+    // To obtain a canonical presentation, sort each block and order the blocks
+    // afterwards after their first elements.
+    for _, b := range blocks {
+        slices.Sort(b)
+    }
+    sort.Slice(blocks, func(i, j int) bool { return blocks[i][0] < blocks[j][0] })
+    for _, b := range blocks {
+        fmt.Println(b)
     }
 
     // Output:

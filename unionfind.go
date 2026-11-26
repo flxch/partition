@@ -18,12 +18,14 @@ package partition
 //   - Employs full path compression during Find operations to flatten trees.
 //   - Optimized fast path for contiguous integer elements 0..N-1 (zero map
 //     overhead).
-
-
 type UnionFind[T comparable] struct {
+    // Negative value: block size; positive value: index to parent element
     parent []int
+    // The elements (listed in the slice)
     items  []T
+    // The elements' indexes.
     index  map[T]int
+    // Number of disjoint sets.
     count  int
 }
 
@@ -48,20 +50,44 @@ func NewUnionFind[T comparable](elems ...T) *UnionFind[T] {
 // lookups for maximum performance.
 func NewUnionFindInt(n int) *UnionFind[int] {
     if n < 0 {
+        // Note that elements can be added later by Add.
         n = 0
     }
-    parent := make([]int, n)
-    items := make([]int, n)
-    for i := 0; i < n; i++ {
-        parent[i] = -1
-        items[i] = i
-    }
-    return &UnionFind[int]{
-        parent: parent,
-        items:  items,
+
+    u := &UnionFind[int]{
+        parent: make([]int, n),
+        items:  make([]int, n),
         index:  nil, // nil signals 0-indexed int fast path
         count:  n,
     }
+    for i := 0; i < n; i++ {
+        u.parent[i] = -1
+        // The element's index is the element itself.  No mapping to an index
+        // necessary.
+        u.items[i] = i
+    }
+    return u
+}
+
+
+// Len returns the total number of elements tracked by this UnionFind instance.
+func (u *UnionFind[T]) Len() int {
+    return len(u.parent)
+}
+
+// Count returns the current number of disjoint sets (connected components).
+func (u *UnionFind[T]) Count() int {
+    return u.count
+}
+
+
+// Reset resets all elements to singleton sets without clearing tracked element
+// identities.
+func (u *UnionFind[T]) Reset() {
+    for i := range u.parent {
+        u.parent[i] = -1
+    }
+    u.count = len(u.parent)
 }
 
 
@@ -105,11 +131,10 @@ func (u *UnionFind[T]) findIndex(x T) int {
         }
         return -1
     }
-    idx, found := u.index[x]
-    if !found {
-        return -1
+    if idx, found := u.index[x]; found {
+        return idx
     }
-    return idx
+    return -1
 }
 
 // findRootIndex returns the root index of internal node index i, performing
@@ -119,14 +144,40 @@ func (u *UnionFind[T]) findRootIndex(i int) int {
     for u.parent[root] >= 0 {
         root = u.parent[root]
     }
-    // Path compression pass
+    // Path compression pass: point directly to root.
     curr := i
     for curr != root {
-        nxt := u.parent[curr]
+        next := u.parent[curr]
         u.parent[curr] = root
-        curr = nxt
+        curr = next
     }
     return root
+}
+
+
+// Size returns the total number of elements in the set containing x.  Returns 0
+// if x is not tracked by this UnionFind instance.
+
+// QUESTION: Could be "merged" with Find. Find returns the root element and the
+// block size that contains x.  If the size is <= 0 then the element is not
+// tracked.
+func (u *UnionFind[T]) Size(x T) int {
+    if idx := u.findIndex(x); idx >= 0 {
+        return -u.parent[u.findRootIndex(idx)]
+    }
+    return 0
+}
+
+
+// Find returns the representative element for the set containing x, and true.
+// If x is not tracked by this UnionFind instance, it returns the zero value of
+// T and false.
+func (u *UnionFind[T]) Find(x T) (T, bool) {
+    if idx := u.findIndex(x); idx >= 0 {
+        return u.items[u.findRootIndex(idx)], true
+    }
+    var zero T
+    return zero, false
 }
 
 // Add adds element x as a new singleton set if it is not already tracked.
@@ -141,25 +192,11 @@ func (u *UnionFind[T]) Add(x T) bool {
     if _, found := u.index[x]; found {
         return false
     }
-    idx := len(u.parent)
-    u.index[x] = idx
+    u.index[x] = len(u.parent)
     u.items = append(u.items, x)
     u.parent = append(u.parent, -1)
     u.count++
     return true
-}
-
-// Find returns the representative element for the set containing x, and true.
-// If x is not tracked by this UnionFind instance, it returns the zero value of
-// T and false.
-func (u *UnionFind[T]) Find(x T) (T, bool) {
-    idx := u.findIndex(x)
-    if idx < 0 {
-        var zero T
-        return zero, false
-    }
-    rootIdx := u.findRootIndex(idx)
-    return u.items[rootIdx], true
 }
 
 // Union merges the set containing x with the set containing y using
@@ -167,11 +204,8 @@ func (u *UnionFind[T]) Find(x T) (T, bool) {
 // added as a new singleton set.  Returns true if x and y were in different sets
 // and have been merged, or false if they were already in the same set.
 func (u *UnionFind[T]) Union(x, y T) bool {
-    ix := u.getOrAddIndex(x)
-    iy := u.getOrAddIndex(y)
-
-    rx := u.findRootIndex(ix)
-    ry := u.findRootIndex(iy)
+    rx := u.findRootIndex(u.getOrAddIndex(x))
+    ry := u.findRootIndex(u.getOrAddIndex(y))
     if rx == ry {
         return false
     }
@@ -187,46 +221,21 @@ func (u *UnionFind[T]) Union(x, y T) bool {
     return true
 }
 
+
 // Connected reports whether elements x and y belong to the same set.  Returns
 // false if either x or y is not tracked by this UnionFind instance.
 func (u *UnionFind[T]) Connected(x, y T) bool {
     ix := u.findIndex(x)
+    if ix < 0 {
+        return false
+    }
     iy := u.findIndex(y)
-    if ix < 0 || iy < 0 {
+    if iy < 0 {
         return false
     }
     return u.findRootIndex(ix) == u.findRootIndex(iy)
 }
 
-// Size returns the total number of elements in the set containing x.  Returns 0
-// if x is not tracked by this UnionFind instance.
-func (u *UnionFind[T]) Size(x T) int {
-    idx := u.findIndex(x)
-    if idx < 0 {
-        return 0
-    }
-    rootIdx := u.findRootIndex(idx)
-    return -u.parent[rootIdx]
-}
-
-// Count returns the current number of disjoint sets (connected components).
-func (u *UnionFind[T]) Count() int {
-    return u.count
-}
-
-// Len returns the total number of elements tracked by this UnionFind instance.
-func (u *UnionFind[T]) Len() int {
-    return len(u.parent)
-}
-
-// Reset resets all elements to singleton sets without clearing tracked element
-// identities.
-func (u *UnionFind[T]) Reset() {
-    for i := range u.parent {
-        u.parent[i] = -1
-    }
-    u.count = len(u.parent)
-}
 
 // Roots returns a slice containing representative elements for all disjoint
 // sets.

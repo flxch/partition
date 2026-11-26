@@ -1,4 +1,4 @@
-# Partition & Union-Find Package
+# Partition Package
 
 This Go package provides efficient generic data structures and
 algorithms for partition refinement and union-find (disjoint-set)
