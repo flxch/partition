@@ -114,6 +114,32 @@ func (p *Partition[T]) Split(v T) {
     }
 }
 
+
+func (p *Partition[T]) Roots() []T {
+    r := make([]T, 0, len(p.hooks))
+    p.Apply(func(e T) { r = append(r, e) }, func(_, _ T) { })
+    return r
+}
+
+func (p *partition[T]) Block(x T) []T {
+    b, ok := b.hook[x]
+    if !ok {
+        return nil
+    }
+    if b == nil {
+        return []T{x}
+    }
+
+    r := make([]T, 0, b.count)
+    for y, c := range p.hook {
+        if c == b {
+            r = append(r, y)
+        }
+    }
+    return r
+}
+
+
 // Apply applies head to the first visited element in a block and tail to the
 // other elements in the block, where tail's second argument is the first
 // element.  Note that there is no guarantee on the order in which the elements

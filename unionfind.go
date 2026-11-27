@@ -155,29 +155,16 @@ func (u *UnionFind[T]) findRootIndex(i int) int {
 }
 
 
-// Size returns the total number of elements in the set containing x.  Returns 0
-// if x is not tracked by this UnionFind instance.
-
-// QUESTION: Could be "merged" with Find. Find returns the root element and the
-// block size that contains x.  If the size is <= 0 then the element is not
-// tracked.
-func (u *UnionFind[T]) Size(x T) int {
-    if idx := u.findIndex(x); idx >= 0 {
-        return -u.parent[u.findRootIndex(idx)]
-    }
-    return 0
-}
-
-
-// Find returns the representative element for the set containing x, and true.
-// If x is not tracked by this UnionFind instance, it returns the zero value of
-// T and false.
-func (u *UnionFind[T]) Find(x T) (T, bool) {
-    if idx := u.findIndex(x); idx >= 0 {
-        return u.items[u.findRootIndex(idx)], true
+// Find returns the representative element for the set containing x and the
+// number of elements in the block that contains x.  If x is not tracked by this
+// UnionFind instance, Find returns the zero value of T and 0.
+func (u *UnionFind[T]) Find(x T) (T, int) {
+    if i := u.findIndex(x); i >= 0 {
+        r := u.findRootIndex(i)
+        return u.items[r], u.parent[r]
     }
     var zero T
-    return zero, false
+    return zero, 0
 }
 
 // Add adds element x as a new singleton set if it is not already tracked.
@@ -222,9 +209,10 @@ func (u *UnionFind[T]) Union(x, y T) bool {
 }
 
 
-// Connected reports whether elements x and y belong to the same set.  Returns
-// false if either x or y is not tracked by this UnionFind instance.
-func (u *UnionFind[T]) Connected(x, y T) bool {
+// Equivalent returns true if the elements x and y belong to the same block.  If
+// x and y are in different blocks, Equivalent returns false. Equivalent also
+// returns false when neither x nor y is tracked by this UnionFind instance u.
+func (u *UnionFind[T]) Equivalent(x, y T) bool {
     ix := u.findIndex(x)
     if ix < 0 {
         return false
@@ -249,8 +237,10 @@ func (u *UnionFind[T]) Roots() []T {
     return roots
 }
 
-// Components returns all disjoint sets as slices of elements of type T.
-func (u *UnionFind[T]) Components() [][]T {
+// Blocks returns all disjoint sets as slices of elements of type T.  There is
+// no guarantee on the order of the blocks and the order of the elements in a
+// block.
+func (u *UnionFind[T]) Blocks() [][]T {
     groups := make(map[int][]T, u.count)
     for i := 0; i < len(u.parent); i++ {
         r := u.findRootIndex(i)

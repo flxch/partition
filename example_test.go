@@ -7,6 +7,7 @@ import (
     "sort"
 
     "github.com/flxch/partition"
+    "eca"
 )
 
 
@@ -91,12 +92,14 @@ func ExampleUnionFind() {
     uf.Union("papaya", "icecream")
     uf.Union("apple", "papaya")
 
-    fmt.Println("Connected(banana, papaya):", uf.Connected("banana", "papaya"))
-    fmt.Println("Size(banana):", uf.Size("banana"))
-    fmt.Println("Count:", uf.Count())
+    fmt.Println("Number of blocks:", uf.Count())
+    _, s := uf.Find("apple")
+    fmt.Println("Size of the block that contains apple:", s)
+    fmt.Println("Are banana and papaya in the same block?", uf.Equivalent("banana", "papaya"))
+
     fmt.Println("Roots:", uf.Roots())
-    fmt.Println("Components:")
-    blocks := uf.Components()
+    fmt.Println("Blocks:")
+    blocks := uf.Blocks()
     // To obtain a canonical presentation, sort each block and order the blocks
     // afterwards after their first elements.
     for _, b := range blocks {
@@ -108,11 +111,11 @@ func ExampleUnionFind() {
     }
 
     // Output:
-    // Connected(banana, papaya): true
-    // Size(banana): 4
-    // Count: 2
+    // Number of blocks: 2
+    // Size of the block that contains apple: 4
+    // Are banana and papaya in the same block? true
     // Roots: [banana tomato]
-    // Components:
+    // Blocks:
     // [apple banana icecream papaya]
     // [tomato]
 }
@@ -128,14 +131,16 @@ func ExampleNewUnionFindInt() {
     uf.Union(1, 2)
     uf.Union(4, 5)
 
-    fmt.Println("Connected(0, 3):", uf.Connected(0, 3))
-    fmt.Println("Connected(0, 4):", uf.Connected(0, 4))
-    fmt.Println("Size(0):", uf.Size(0))
-    fmt.Println("Size(4):", uf.Size(4))
+    fmt.Println("Equivalent(0, 3):", uf.Equivalent(0, 3))
+    fmt.Println("Equivalent(0, 4):", uf.Equivalent(0, 4))
+    _, s := uf.Find(0)
+    fmt.Println("Size(0):", s)
+    _, s := uf.Find(04
+    fmt.Println("Size(4):", s)
     fmt.Println("Count:", uf.Count())
     fmt.Println("Roots:", uf.Roots())
-    fmt.Println("Components:")
-    blocks := uf.Components()
+    fmt.Println("Blocks:")
+    blocks := uf.Blocks()
     // To obtain a canonical presentation, sort each block and order the blocks
     // afterwards after their first elements.
     for _, b := range blocks {
@@ -147,13 +152,13 @@ func ExampleNewUnionFindInt() {
     }
 
     // Output:
-    // Connected(0, 3): true
-    // Connected(0, 4): false
+    // Equivalent(0, 3): true
+    // Equivalent(0, 4): false
     // Size(0): 4
     // Size(4): 2
     // Count: 2
     // Roots: [0 4]
-    // Components:
+    // Blocks:
     // [0 1 2 3]
     // [4 5]
 }
