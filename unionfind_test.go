@@ -18,12 +18,8 @@ func TestUnionFindInt(t *testing.T) {
     }
 
     for i := 0; i < n; i++ {
-        root, ok := uf.Find(i)
-        if !ok || root != i {
-            t.Errorf("expected Find(%d) = (%d, true), got (%d, %v)", i, i, root, ok)
-        }
-        if uf.Size(i) != 1 {
-            t.Errorf("expected Size(%d) = 1, got %d", i, uf.Size(i))
+        if root, c := uf.Find(i); c != 1 || root != i {
+            t.Errorf("expected Find(%d) = (%d, 1), got (%d, %v)", i, i, root, c)
         }
     }
 
@@ -34,7 +30,7 @@ func TestUnionFindInt(t *testing.T) {
     if uf.Union(0, 1) {
         t.Errorf("expected redundant Union(0, 1) to return false")
     }
-    if !uf.Connected(0, 1) {
+    if !uf.Equivalent(0, 1) {
         t.Errorf("expected 0 and 1 to be connected")
     }
     if uf.Count() != n-1 {
@@ -48,31 +44,26 @@ func TestUnionFindInt(t *testing.T) {
     uf.Union(2, 3)
     uf.Union(1, 3)
 
-    if !uf.Connected(0, 3) {
+    if !uf.Equivalent(0, 3) {
         t.Errorf("expected 0 and 3 to be connected through transitive union")
     }
     if uf.Size(0) != 4 {
         t.Errorf("expected set size of merged component to be 4, got %d", uf.Size(0))
     }
 
-    // Test Roots
-    roots := uf.Roots()
-    if len(roots) != uf.Count() {
+    if roots := uf.Representatives(); len(roots) != uf.Count() {
         t.Errorf("expected %d roots, got %d", uf.Count(), len(roots))
     }
 
-    // Test Components
-    comps := uf.Components()
-    if len(comps) != uf.Count() {
-        t.Errorf("expected %d components, got %d", uf.Count(), len(comps))
+    if blocks := uf.Blocks(); len(blocks) != uf.Count() {
+        t.Errorf("expected %d blocks, got %d", uf.Count(), len(blocks))
     }
 
-    // Test Reset
     uf.Reset()
     if uf.Count() != n {
         t.Errorf("expected Count after Reset to be %d, got %d", n, uf.Count())
     }
-    if uf.Connected(0, 1) {
+    if uf.Equivalent(0, 1) {
         t.Errorf("expected 0 and 1 to no longer be connected after Reset")
     }
 }
@@ -92,13 +83,13 @@ func TestUnionFindGenericStrings(t *testing.T) {
     uf.Union("cherry", "date")
     uf.Union("banana", "cherry")
 
-    if !uf.Connected("apple", "date") {
+    if !uf.Equivalent("apple", "date") {
         t.Errorf("expected apple and date to be connected")
     }
     if uf.Size("apple") != 4 {
         t.Errorf("expected size of component to be 4, got %d", uf.Size("apple"))
     }
-    if uf.Connected("apple", "elderberry") {
+    if uf.Equivalent("apple", "elderberry") {
         t.Errorf("apple and elderberry should not be connected")
     }
 
@@ -107,7 +98,7 @@ func TestUnionFindGenericStrings(t *testing.T) {
     if uf.Len() != 6 {
         t.Errorf("expected Len to increase to 6 after dynamic addition, got %d", uf.Len())
     }
-    if !uf.Connected("elderberry", "fig") {
+    if !uf.Equivalent("elderberry", "fig") {
         t.Errorf("elderberry and fig should be connected")
     }
 }
@@ -124,10 +115,10 @@ func TestUnionFindGenericStruct(t *testing.T) {
     uf := partition.NewUnionFind[Point](p1, p2, p3)
     uf.Union(p1, p2)
 
-    if !uf.Connected(p1, p2) {
+    if !uf.Equivalent(p1, p2) {
         t.Errorf("p1 and p2 should be connected")
     }
-    if uf.Connected(p1, p3) {
+    if uf.Equivalent(p1, p3) {
         t.Errorf("p1 and p3 should not be connected")
     }
 }
@@ -139,14 +130,13 @@ func TestUnionFindEdgeCases(t *testing.T) {
         t.Errorf("expected empty UnionFind to have 0 len and count")
     }
 
-    _, ok := ufEmpty.Find(42)
-    if ok {
+    if _, c := ufEmpty.Find(42); c > 0 {
         t.Errorf("expected Find on non-existent element to return ok=false")
     }
     if ufEmpty.Size(42) != 0 {
         t.Errorf("expected Size on non-existent element to be 0")
     }
-    if ufEmpty.Connected(1, 2) {
+    if ufEmpty.Equivalent(1, 2) {
         t.Errorf("expected Connected on non-existent elements to be false")
     }
 

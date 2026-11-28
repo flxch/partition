@@ -19,9 +19,9 @@ package partition
 //   - Optimized fast path for contiguous integer elements 0..N-1 (zero map
 //     overhead).
 type UnionFind[T comparable] struct {
-    // Negative value: block size; positive value: index to parent element
+    // Negative value: block size; positive value: index to parent element.
     parent []int
-    // The elements (listed in the slice)
+    // The elements (listed in the slice).
     items  []T
     // The elements' indexes.
     index  map[T]int
@@ -80,6 +80,14 @@ func (u *UnionFind[T]) Count() int {
     return u.count
 }
 
+// Size returns the number of elements in the block that contains x.
+func (u *UnionFind[T]) Size(x T) int {
+    if i := u.findIndex(x); i >= 0 {
+        return -u.parent[u.findRootIndex(i)]
+    }
+    return 0
+}
+
 
 // Reset resets all elements to singleton sets without clearing tracked element
 // identities.
@@ -91,6 +99,10 @@ func (u *UnionFind[T]) Reset() {
 }
 
 
+func (u *UnionFind[T]) isIntPrefix() bool {
+    return u.index == nil
+}
+
 // ensureMap populates the index map if it was previously nil (e.g. converted
 // from int fast-path).
 func (u *UnionFind[T]) ensureMap() {
@@ -101,6 +113,7 @@ func (u *UnionFind[T]) ensureMap() {
         }
     }
 }
+
 
 // getOrAddIndex returns the internal index for element x, adding it as a
 // singleton if missing.
@@ -161,7 +174,7 @@ func (u *UnionFind[T]) findRootIndex(i int) int {
 func (u *UnionFind[T]) Find(x T) (T, int) {
     if i := u.findIndex(x); i >= 0 {
         r := u.findRootIndex(i)
-        return u.items[r], u.parent[r]
+        return u.items[r], -u.parent[r]
     }
     var zero T
     return zero, 0
@@ -172,6 +185,7 @@ func (u *UnionFind[T]) Find(x T) (T, int) {
 func (u *UnionFind[T]) Add(x T) bool {
     if u.index == nil {
         if v, ok := any(x).(int); ok && v >= 0 && v < len(u.parent) {
+            // TODO: v == len(u.parent) would be fine: append an element to the slices.
             return false // Already present in contiguous int range
         }
         u.ensureMap()
@@ -225,10 +239,10 @@ func (u *UnionFind[T]) Equivalent(x, y T) bool {
 }
 
 
-// Roots returns a slice containing representative elements for all disjoint
+// Representatives returns a slice containing representative elements for all disjoint
 // sets.
-func (u *UnionFind[T]) Roots() []T {
-    roots := make([]T, 0, u.count)
+func (u *UnionFind[T]) Representatives() []T {
+    roots := make([]T, 0, u.Count())
     for i, p := range u.parent {
         if p < 0 {
             roots = append(roots, u.items[i])
@@ -241,14 +255,45 @@ func (u *UnionFind[T]) Roots() []T {
 // no guarantee on the order of the blocks and the order of the elements in a
 // block.
 func (u *UnionFind[T]) Blocks() [][]T {
-    groups := make(map[int][]T, u.count)
+    res := make([][]T, 0, u.Count())
+    idx := make(map[T]int, u.Count())
+    u.Apply(func(x T) bool { _, ok := idx[x]; return ok },
+        func(x, y T) {
+            if x == y {
+                // y is the block's representative. Memorize that the block's
+                // representative was visited and add it to the slice.  r is the
+                // index at which the block's slice is stored in res.
+                r := len(res)
+                idx[x] = r
+                res = append(res, append(make([]T, 0, -u.parent[r]), x))
+            } else {
+                // Add block element to the slice.
+                r := idx[x]
+                res[r] = append(res[r], y)
+            }
+        })
+    return res
+}
+
+// Apply executes the function apply function for each element in a block.  Its
+// first argument is the block's representative and the second argument the
+// element.  The apply function is called for the block's representative (first
+// and second argument) before it is called for the other block elements.  The
+// function visited must return true iff apply was already called for a block's
+// representative.  There is no guarantee on the order of the elements, except
+// that a block's representative is visited first.
+func (u *UnionFind[T]) Apply(visited func(T) bool, apply func(T, T)) {
     for i := 0; i < len(u.parent); i++ {
         r := u.findRootIndex(i)
-        groups[r] = append(groups[r], u.items[i])
+        if !visited(u.items[r]) {
+            // Apply apply first to the block's representative if not already
+            // done previously.
+            apply(u.items[r], u.items[r])
+        }
+        if i != r {
+            // The element at index i is not the block's representative.
+            // Apply apply.
+            apply(u.items[r], u.items[i])
+        }
     }
-    res := make([][]T, 0, len(groups))
-    for _, g := range groups {
-        res = append(res, g)
-    }
-    return res
 }

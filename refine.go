@@ -1,16 +1,15 @@
 package partition
 
 
-// Partition is a generic partition refinement structure for elements of type T.
+// Generic partition refinement for elements of type T.
 type Partition[T comparable] struct {
     // The number of refinement steps carried out so far.
     steps   int
-    // Each element points to the block it belongs to (or nil if singleton).
+    // Each element points to the block that contains it (can be nil if the
+    // block only contains a single element).
     hooks   map[T]*block[T]
     // Blocks for recycling.
     pool    []*block[T]
-    // Temporary storage of elements.
-    scratch map[T]struct{}
 }
 
 type block[T comparable] struct {
@@ -18,22 +17,54 @@ type block[T comparable] struct {
     count    int
     // Pointer to the splitted block during a refinement.
     split    *block[T]
-    // Is the split pointer valid, i.e., was the block split in the current
-    // refinement step?
-    valid    int
     // The first block element.
     first    T
+    // Is the pointer split and first valid, i.e., was the block split created
+    // in the current refinement step (valid == p.step)?
+    valid    int
 }
 
 type SplitFn[T comparable] func(T) bool
 
+
+// Refine first refines the partition on the given elements, starting with the
+// trivial partition (a single block) and iteratively refining the blocks
+// according to the "splitters" in splits. Afterwards, Refine calls head for the
+// first element in each final block and tail is called for the other elements
+// in each block, where tail's second argument is the block's first element.
+func Refine[T comparable](head func(T), tail func(T, T), elems []T, splits ...[]T) {
+    if len(elems) > 0 {
+        p := Trivial(elems)
+        for _, s := range splits {
+            p.Refine(s)
+        }
+        p.Apply(head, tail)
+    }
+}
+
+// RefineFn is similar to Refine, except that its argument splitFns replaces
+// Refine's last argument splits. For each provided split function, RefineFn
+// carries out a refinement steps.
+func RefineFn[T comparable](head func(T), tail func(T, T), elems []T, splits ...SplitFn[T]) {
+    if len(elems) > 0 {
+        p := Trivial(elems)
+        for _, s := range splits {
+            p.RefineFn(s)
+        }
+        p.Apply(head, tail)
+    }
+}
+
+
+//func NewRefinement[T comparable](elems []T) *Refinement[T] {
+//    // ...
+//}
 
 // Trivial returns the partition with a single block that contains all elements.
 func Trivial[T comparable](elems []T) *Partition[T] {
     p := &Partition[T]{
         steps:   0,
         hooks:   make(map[T]*block[T], len(elems)),
-        scratch: make(map[T]struct{}, len(elems)),
     }
     b := p.newBlock(len(elems))
     for _, v := range elems {
@@ -43,70 +74,48 @@ func Trivial[T comparable](elems []T) *Partition[T] {
 }
 
 
-// Next prepares for the next refinement step.
-// QUESTION: Why is this a public function?
-func (p *Partition[T]) Next() {
+// Next prepares for the next refinement step.  In particular, the split pointer
+// in each block becomes invalid.
+func (p *Partition[T]) next() {
     p.steps++
 }
 
+
 // Refine splits each block in the partition according to the subset s.
 func (p *Partition[T]) Refine(s []T) {
-    p.Next()
+    p.next()
     for _, v := range s {
-        p.Split(v)
-    }
-    // if len(s) <= len(p.hooks) / 2 {
-    //     for _, v := range s {
-    //         p.Split(v)
-    //     }
-    // } else {
-    //     // Split by the complement of s using scratch map to avoid allocations.
-    //     // TODO: Not sure if this else branch makes sense. It should be an
-    //     // optimization.  However, clearing a map and adding the elements to the
-    //     // map, is a time consuming step.  Benchmarking this part should provide
-    //     // clarity.
-    //     clear(p.scratch)
-    //     for _, v := range s {
-    //         p.scratch[v] = struct{}{}
-    //     }
-    //     for v := range p.hooks {
-    //         if _, found := p.scratch[v]; !found {
-    //             p.Split(v)
-    //         }
-    //     }
-    // }
-}
-
-// RefineFn is the dual version of Refine, using a predicate.
-func (p *Partition[T]) RefineFn(f SplitFn[T]) {
-    p.Next()
-    for v := range p.hooks {
-        if f(v) {
-            p.Split(v)
+        if b, ok := p.hooks[v]; ok && b != nil {
+            p.splitByElem(v, b)
         }
     }
 }
 
-// Split removes the element v from its block, provided that the block is not a
-// singleton.
-// QUESTION: Why is this a public function?
-func (p *Partition[T]) Split(v T) {
-    b := p.hooks[v]
-    switch {
-    case b == nil:
-        return
-    case b.valid == p.steps:
+// splitByElem removes the element v from its block b, provided that the block
+// is not a singleton.  Note that it is assumed that v is an element of b.
+func (p *Partition[T]) splitByElem(v T, b *block[T]) {
+    if b.valid == p.steps {
+        // The block b was already split in this refinement step. Put v into the
+        // previously newly created block.
         b.split.count++
         p.hooks[v] = b.split
-        if b.count > 1 {
-            b.count--
-        } else {
+        if b.count == 1 {
+            // v was the last element in the block b. Since b is empty now, we
+            // can recycle it.
             p.recycleBlock(b)
+        } else {
+            // The block b still contains at least one other element.
+            b.count--
+            // Note that if b.count == 1 now, we cannot recycle b here, since we
+            // do not know the other element w in b and set p.hooks[w] = nil.
         }
-    case b.count == 1:
+    } else if b.count == 1 {
+        // Block b is a singleton and can be recycled.
         p.hooks[v] = nil
         p.recycleBlock(b)
-    default:
+    } else {
+        // Split block and put v in a new block.  Also memorize the new block
+        // and that the block was changed in this refinement step.
         b.valid = p.steps
         b.split = p.newBlock(1)
         p.hooks[v] = b.split
@@ -114,39 +123,62 @@ func (p *Partition[T]) Split(v T) {
     }
 }
 
-
-func (p *Partition[T]) Roots() []T {
-    r := make([]T, 0, len(p.hooks))
-    p.Apply(func(e T) { r = append(r, e) }, func(_, _ T) { })
-    return r
-}
-
-func (p *partition[T]) Block(x T) []T {
-    b, ok := b.hook[x]
-    if !ok {
-        return nil
-    }
-    if b == nil {
-        return []T{x}
-    }
-
-    r := make([]T, 0, b.count)
-    for y, c := range p.hook {
-        if c == b {
-            r = append(r, y)
+// RefineFn is the dual version of Refine, using a predicate.
+func (p *Partition[T]) RefineFn(f SplitFn[T]) {
+    p.next()
+    for v, b := range p.hooks {
+        if b != nil {
+            p.splitByFunc(v, b, f)
         }
     }
-    return r
+}
+
+// splitByFunc removes the element v from its block b, provided f(v) is true and
+// that the block is not a singleton.  Note that it is assumed that v is an
+// element of b.
+func (p *Partition[T]) splitByFunc(v T, b *block[T], f SplitFn[T]) {
+    if b.valid != p.steps {
+        // The block b has not yet been changed in this refinement step.
+        if b.count == 1 {
+            // The block b is a singleton.  No need to split b (even if f(v) is
+            // true).  But b can be recycled.
+            p.hooks[v] = nil
+            p.recycleBlock(b)
+        } else if f(v) {
+            // Split block and put v in a new block.  Also memorize the new
+            // block.  Note that b contains at least one other element w.  If w
+            // is the only element in b, b cannot be recycled, since we do not
+            // know w and can set p.hooks[w] = nil.
+            b.valid = p.steps
+            b.split = p.newBlock(1)
+            p.hooks[v] = b.split
+            b.count--
+        }
+    } else if f(v) {
+        // b has been split previously in this refinement step.  Move v to
+        // the previously newly created block.
+        b.split.count++
+        p.hooks[v] = b.split
+        if b.count == 1 {
+            // b is empty now.
+            p.recycleBlock(b)
+        } else {
+            b.count--
+            // Even if b contains now a single element w, b cannot be
+            // recycled, since we do not know w and can set p.hooks[w] =
+            // nil.
+        }
+    }
 }
 
 
 // Apply applies head to the first visited element in a block and tail to the
-// other elements in the block, where tail's second argument is the first
-// element.  Note that there is no guarantee on the order in which the elements
-// a block are visited.
+// other elements in the block, where tail's first argument is the block's first
+// visited element and the second argument the later visited block elements.
+// Note that there is no guarantee on the order in which the elements in a block
+// are visited.
 func (p *Partition[T]) Apply(head func(T), tail func(T, T)) {
-    p.Next()
-
+    p.next()
     for v, b := range p.hooks {
         switch {
         case b == nil || b.count == 1: // Singleton block.
@@ -157,10 +189,84 @@ func (p *Partition[T]) Apply(head func(T), tail func(T, T)) {
             b.valid = p.steps
             // Memorize the block's first element.
             b.first = v
-        default:                       // Nonsingleton block that we have seen before.
-            tail(v, b.first)
+        case tail != nil:              // Nonsingleton block that we have seen before.
+            tail(b.first, v)
         }
     }
+}
+
+
+// Len returns the number of elements for which the partition is refined.
+func (p *Partition[T]) Len() int {
+    return len(p.hooks)
+}
+
+// Count returns the number of blocks.
+func (p *Partition[T]) Count() int {
+    c := 0
+    p.Apply(func(_ T) { c++ }, nil)
+    return c
+}
+
+// Size returns the size of the block that contains v.  If v is not tracked,
+// Size returns 0.
+func (p *Partition[T]) Size(v T) int {
+    b, ok := p.hooks[v]
+    if !ok {
+        return 0
+    }
+    if b == nil {
+        return 1
+    }
+    return b.count
+}
+
+
+// Equivalent returns true if x and y are in the same block.  Equivalent returns
+// false, otherwise.  If x and y are not tracked, Equivalent returns also false.
+func (p *Partition[T]) Equivalent(x, y T) bool {
+    b, ok1 := p.hooks[x]
+    if !ok1 {
+        return false
+    }
+    c, ok2 := p.hooks[y]
+    if !ok2 {
+        return false
+    }
+    return b == c
+}
+
+// Representatives returns a slice that contains for each block one
+// representatitive element.  There is no gurarantee on the order of the
+// elements in the returned slice.
+func (p *Partition[T]) Representatives() []T {
+    r := make([]T, 0, len(p.hooks))
+    p.Apply(func(e T) { r = append(r, e) }, nil)
+    return r
+}
+
+// Block returns the elements of the block that contains x.  If x is not
+// tracked, Block returns nil.
+func (p *Partition[T]) Block(x T) []T {
+    b, ok := p.hooks[x]
+    if !ok {
+        return nil
+    }
+    if b == nil || b.count == 1 {
+        return []T{x}
+    }
+
+    r := make([]T, 0, b.count)
+    for y, c := range p.hooks {
+        if c == b {
+            r = append(r, y)
+            if len(r) == b.count {
+                // We can stop early.
+                break
+            }
+        }
+    }
+    return r
 }
 
 
@@ -182,67 +288,6 @@ func (p *Partition[T]) newBlock(n int) *block[T] {
 
 func (p *Partition[T]) recycleBlock(b *block[T]) {
     p.pool = append(p.pool, b)
-}
-
-
-// Refine first refines the partition on the given elements, starting with the
-// trivial partition (a single block) and iteratively refining the blocks
-// according to the "splitters" in splits. Afterwards, Refine calls head for the
-// first element in each final block and tail is called for the other elements
-// in each block, where tail's second argument is the block's first element.
-func Refine[T comparable](head func(T), tail func(T, T), elems []T, splits ...[]T) {
-    if len(elems) > 0 {
-        p := Trivial(elems)
-        for _, s := range splits {
-            p.Refine(s)
-        }
-        p.Apply(head, tail)
-    }
-}
-
-// RefineFn is similar to Refine, except that its argument splitFns replaces
-// Refine's last argument splits. For each provided split function, RefineFn
-// carries out a refinement steps.
-func RefineFn[T comparable](head func(T), tail func(T, T), elems []T, splitFns ...SplitFn[T]) {
-    if len(elems) > 0 {
-        p := Trivial(elems)
-        for _, s := range splitFns {
-            p.RefineFn(s)
-        }
-        p.Apply(head, tail)
-    }
-}
-
-// RefineCh is similar to Refine, except that the "splitters" elements are sent
-// over the channel in. A separate goroutine takes care of receiving the split
-// elements over the in channel and carrying out the refinement steps.  A new
-// iteration is started by sending a next value. Closing the in channel
-// finalizes the partition refinement and triggers the execution of head and
-// tail. When done, the function's returned channel is closed.
-func RefineCh[T comparable](head func(T), tail func(T, T), elems []T, in <-chan T, next T) <-chan struct{} {
-    if len(elems) < 1 {
-        // No parition when no elements.
-        // QUESTION: Should we panic? Same for the other refine functions.
-        return nil
-    }
-
-    done := make(chan struct{}, 0)
-    p := Trivial(elems)
-    p.Next()
-
-    go func() {
-        for v := range in {
-            if v != next {
-                p.Split(v)
-            } else {
-                p.Next()
-            }
-        }
-        p.Apply(head, tail)
-        close(done)
-    }()
-
-    return done
 }
 
 

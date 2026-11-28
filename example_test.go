@@ -7,7 +7,6 @@ import (
     "sort"
 
     "github.com/flxch/partition"
-    "eca"
 )
 
 
@@ -22,7 +21,7 @@ func ExampleRefine() {
     // a single block.  Write the blocks of the resulting partition blocks to
     // the slice blocks.
     blocks := make([][]int, len(elems))
-    partition.Refine(func(a int) { blocks[a] = []int{a}}, func(a, b int) { blocks[b] = append(blocks[b], a) },
+    partition.Refine(func(a int) { blocks[a] = []int{a}}, func(a, b int) { blocks[a] = append(blocks[a], b) },
         elems, splitters...)
     // Note that there is no guarantee how the elements in a block are ordered
     // and at what index a block appears in the slice blocks.
@@ -58,7 +57,7 @@ func ExampleRefineFn() {
     // a single block.  Write the blocks of the resulting partition blocks to
     // the slice map at the end.
     blocks := make(map[string][]string, len(elems))
-    partition.RefineFn(func(a string) { blocks[a] = []string{a}}, func(a, b string) { blocks[b] = append(blocks[b], a) },
+    partition.RefineFn(func(a string) { blocks[a] = []string{a}}, func(a, b string) { blocks[a] = append(blocks[a], b) },
         elems,
         likedByMinions, isFruit)
     // Note that there is no guarantee how the elements in a slice are ordered
@@ -97,7 +96,7 @@ func ExampleUnionFind() {
     fmt.Println("Size of the block that contains apple:", s)
     fmt.Println("Are banana and papaya in the same block?", uf.Equivalent("banana", "papaya"))
 
-    fmt.Println("Roots:", uf.Roots())
+    fmt.Println("Block representatives:", uf.Representatives())
     fmt.Println("Blocks:")
     blocks := uf.Blocks()
     // To obtain a canonical presentation, sort each block and order the blocks
@@ -114,7 +113,7 @@ func ExampleUnionFind() {
     // Number of blocks: 2
     // Size of the block that contains apple: 4
     // Are banana and papaya in the same block? true
-    // Roots: [banana tomato]
+    // Block representatives: [banana tomato]
     // Blocks:
     // [apple banana icecream papaya]
     // [tomato]
@@ -135,10 +134,10 @@ func ExampleNewUnionFindInt() {
     fmt.Println("Equivalent(0, 4):", uf.Equivalent(0, 4))
     _, s := uf.Find(0)
     fmt.Println("Size(0):", s)
-    _, s := uf.Find(04
+    _, s = uf.Find(4)
     fmt.Println("Size(4):", s)
     fmt.Println("Count:", uf.Count())
-    fmt.Println("Roots:", uf.Roots())
+    fmt.Println("Block representatives:", uf.Representatives())
     fmt.Println("Blocks:")
     blocks := uf.Blocks()
     // To obtain a canonical presentation, sort each block and order the blocks
@@ -157,7 +156,7 @@ func ExampleNewUnionFindInt() {
     // Size(0): 4
     // Size(4): 2
     // Count: 2
-    // Roots: [0 4]
+    // Block representatives: [0 4]
     // Blocks:
     // [0 1 2 3]
     // [4 5]
