@@ -2,7 +2,7 @@ package partition
 
 
 // Generic partition refinement for elements of type T.
-type Partition[T comparable] struct {
+type Refinement[T comparable] struct {
     // The number of refinement steps carried out so far.
     steps   int
     // Each element points to the block that contains it (can be nil if the
@@ -34,7 +34,7 @@ type SplitFn[T comparable] func(T) bool
 // in each block, where tail's second argument is the block's first element.
 func Refine[T comparable](head func(T), tail func(T, T), elems []T, splits ...[]T) {
     if len(elems) > 0 {
-        p := Trivial(elems)
+        p := NewRefinement(elems)
         for _, s := range splits {
             p.Refine(s)
         }
@@ -47,7 +47,7 @@ func Refine[T comparable](head func(T), tail func(T, T), elems []T, splits ...[]
 // carries out a refinement steps.
 func RefineFn[T comparable](head func(T), tail func(T, T), elems []T, splits ...SplitFn[T]) {
     if len(elems) > 0 {
-        p := Trivial(elems)
+        p := NewRefinement(elems)
         for _, s := range splits {
             p.RefineFn(s)
         }
@@ -56,13 +56,10 @@ func RefineFn[T comparable](head func(T), tail func(T, T), elems []T, splits ...
 }
 
 
-//func NewRefinement[T comparable](elems []T) *Refinement[T] {
-//    // ...
-//}
-
-// Trivial returns the partition with a single block that contains all elements.
-func Trivial[T comparable](elems []T) *Partition[T] {
-    p := &Partition[T]{
+// NewRefinement returns the partition with a single block that contains all
+// elements.
+func NewRefinement[T comparable](elems []T) *Refinement[T] {
+    p := &Refinement[T]{
         steps:   0,
         hooks:   make(map[T]*block[T], len(elems)),
     }
@@ -76,13 +73,13 @@ func Trivial[T comparable](elems []T) *Partition[T] {
 
 // Next prepares for the next refinement step.  In particular, the split pointer
 // in each block becomes invalid.
-func (p *Partition[T]) next() {
+func (p *Refinement[T]) next() {
     p.steps++
 }
 
 
 // Refine splits each block in the partition according to the subset s.
-func (p *Partition[T]) Refine(s []T) {
+func (p *Refinement[T]) Refine(s []T) {
     p.next()
     for _, v := range s {
         if b, ok := p.hooks[v]; ok && b != nil {
@@ -93,7 +90,7 @@ func (p *Partition[T]) Refine(s []T) {
 
 // splitByElem removes the element v from its block b, provided that the block
 // is not a singleton.  Note that it is assumed that v is an element of b.
-func (p *Partition[T]) splitByElem(v T, b *block[T]) {
+func (p *Refinement[T]) splitByElem(v T, b *block[T]) {
     if b.valid == p.steps {
         // The block b was already split in this refinement step. Put v into the
         // previously newly created block.
@@ -124,7 +121,7 @@ func (p *Partition[T]) splitByElem(v T, b *block[T]) {
 }
 
 // RefineFn is the dual version of Refine, using a predicate.
-func (p *Partition[T]) RefineFn(f SplitFn[T]) {
+func (p *Refinement[T]) RefineFn(f SplitFn[T]) {
     p.next()
     for v, b := range p.hooks {
         if b != nil {
@@ -136,7 +133,7 @@ func (p *Partition[T]) RefineFn(f SplitFn[T]) {
 // splitByFunc removes the element v from its block b, provided f(v) is true and
 // that the block is not a singleton.  Note that it is assumed that v is an
 // element of b.
-func (p *Partition[T]) splitByFunc(v T, b *block[T], f SplitFn[T]) {
+func (p *Refinement[T]) splitByFunc(v T, b *block[T], f SplitFn[T]) {
     if b.valid != p.steps {
         // The block b has not yet been changed in this refinement step.
         if b.count == 1 {
@@ -177,7 +174,7 @@ func (p *Partition[T]) splitByFunc(v T, b *block[T], f SplitFn[T]) {
 // visited element and the second argument the later visited block elements.
 // Note that there is no guarantee on the order in which the elements in a block
 // are visited.
-func (p *Partition[T]) Apply(head func(T), tail func(T, T)) {
+func (p *Refinement[T]) Apply(head func(T), tail func(T, T)) {
     p.next()
     for v, b := range p.hooks {
         switch {
@@ -197,12 +194,12 @@ func (p *Partition[T]) Apply(head func(T), tail func(T, T)) {
 
 
 // Len returns the number of elements for which the partition is refined.
-func (p *Partition[T]) Len() int {
+func (p *Refinement[T]) Len() int {
     return len(p.hooks)
 }
 
 // Count returns the number of blocks.
-func (p *Partition[T]) Count() int {
+func (p *Refinement[T]) Count() int {
     c := 0
     p.Apply(func(_ T) { c++ }, nil)
     return c
@@ -210,7 +207,7 @@ func (p *Partition[T]) Count() int {
 
 // Size returns the size of the block that contains v.  If v is not tracked,
 // Size returns 0.
-func (p *Partition[T]) Size(v T) int {
+func (p *Refinement[T]) Size(v T) int {
     b, ok := p.hooks[v]
     if !ok {
         return 0
@@ -224,7 +221,7 @@ func (p *Partition[T]) Size(v T) int {
 
 // Equivalent returns true if x and y are in the same block.  Equivalent returns
 // false, otherwise.  If x and y are not tracked, Equivalent returns also false.
-func (p *Partition[T]) Equivalent(x, y T) bool {
+func (p *Refinement[T]) Equivalent(x, y T) bool {
     b, ok1 := p.hooks[x]
     if !ok1 {
         return false
@@ -239,7 +236,7 @@ func (p *Partition[T]) Equivalent(x, y T) bool {
 // Representatives returns a slice that contains for each block one
 // representatitive element.  There is no gurarantee on the order of the
 // elements in the returned slice.
-func (p *Partition[T]) Representatives() []T {
+func (p *Refinement[T]) Representatives() []T {
     r := make([]T, 0, len(p.hooks))
     p.Apply(func(e T) { r = append(r, e) }, nil)
     return r
@@ -247,7 +244,7 @@ func (p *Partition[T]) Representatives() []T {
 
 // Block returns the elements of the block that contains x.  If x is not
 // tracked, Block returns nil.
-func (p *Partition[T]) Block(x T) []T {
+func (p *Refinement[T]) Block(x T) []T {
     b, ok := p.hooks[x]
     if !ok {
         return nil
@@ -272,7 +269,7 @@ func (p *Partition[T]) Block(x T) []T {
 
 // Helper functions for blocks: creation and recycling.
 
-func (p *Partition[T]) newBlock(n int) *block[T] {
+func (p *Refinement[T]) newBlock(n int) *block[T] {
     if len(p.pool) == 0 {
         // Create a fresh block, since noone can be recycled.
         return &block[T]{count: n}
@@ -286,7 +283,7 @@ func (p *Partition[T]) newBlock(n int) *block[T] {
     return b
 }
 
-func (p *Partition[T]) recycleBlock(b *block[T]) {
+func (p *Refinement[T]) recycleBlock(b *block[T]) {
     p.pool = append(p.pool, b)
 }
 

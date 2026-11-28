@@ -99,10 +99,6 @@ func (u *UnionFind[T]) Reset() {
 }
 
 
-func (u *UnionFind[T]) isIntPrefix() bool {
-    return u.index == nil
-}
-
 // ensureMap populates the index map if it was previously nil (e.g. converted
 // from int fast-path).
 func (u *UnionFind[T]) ensureMap() {
@@ -119,7 +115,16 @@ func (u *UnionFind[T]) ensureMap() {
 // singleton if missing.
 func (u *UnionFind[T]) getOrAddIndex(x T) int {
     if u.index == nil {
-        if v, ok := any(x).(int); ok && v >= 0 && v < len(u.parent) {
+        v, ok := any(x).(int)
+        if !ok {
+            panic("elements of union-find struct not of type int")
+        }
+        if v >= 0 && v < len(u.parent) {
+            return v
+        } else if v == len(u.parent) {
+            u.items = append(u.items, x)
+            u.parent = append(u.parent, -1)
+            u.count++
             return v
         }
         u.ensureMap()
@@ -184,9 +189,19 @@ func (u *UnionFind[T]) Find(x T) (T, int) {
 // Returns true if x was newly added, or false if x was already present.
 func (u *UnionFind[T]) Add(x T) bool {
     if u.index == nil {
-        if v, ok := any(x).(int); ok && v >= 0 && v < len(u.parent) {
-            // TODO: v == len(u.parent) would be fine: append an element to the slices.
-            return false // Already present in contiguous int range
+        v, ok := any(x).(int)
+        if !ok {
+            panic("elements of union-find struct not of type int")
+        }
+        if v >= 0 && v < len(u.parent) {
+            // Already present in contiguous int range.
+            return false
+        } else if v == len(u.parent) {
+            // Extend contiguous int range by adjacent new element.
+            u.items = append(u.items, x)
+            u.parent = append(u.parent, -1)
+            u.count++
+            return true
         }
         u.ensureMap()
     }

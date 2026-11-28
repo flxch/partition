@@ -35,7 +35,7 @@ func BenchmarkRefine(b *testing.B) {
     }
 
     for i := 0; i < b.N; i++ {
-        p := Trivial(elems)
+        p := NewRefinement(elems)
 
         for q := 0; q < steps; q++ {
             s := splitter(size)
@@ -60,7 +60,7 @@ func BenchmarkRefines(b *testing.B) {
             c.SetBytes(int64(c.N))
 
             for i := 0; i < c.N; i++ {
-                p := Trivial(elems)
+                p := NewRefinement(elems)
                 for s := 0; s < q; s++ {
                     p.Refine(splitter(size))
                 }
@@ -85,7 +85,7 @@ func BenchmarkSingleRefine(b *testing.B) {
     }
 
     for i := 0; i < b.N; i++ {
-        p := Trivial(elems)
+        p := NewRefinement(elems)
         for q := 0; q < steps / 3; q++ {
             s := splitter(size)
             p.Refine(s)
@@ -111,7 +111,7 @@ func BenchmarkRefineApply(b *testing.B) {
     }
 
     for i := 0; i < b.N; i++ {
-        p := Trivial(elems)
+        p := NewRefinement(elems)
         for q := 0; q < steps; q++ {
             s := splitter(size)
             p.Refine(s)
@@ -135,7 +135,7 @@ func BenchmarkRefineAll(b *testing.B) {
     }
     for i := 0; i < size; i++ {
         b.StartTimer()
-        p := Trivial(elems)
+        p := NewRefinement(elems)
         b.StopTimer()
 
         for q := 0; q < steps; q++ {
